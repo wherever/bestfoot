@@ -1,0 +1,379 @@
+import os 
+import sys 
+import time 
+from datetime import date 
+import subprocess
+import shutil
+
+#------------------------------------------------------------------
+#copyright OnlineImageLLC, all rights reserved
+
+#Holly Glaser 1/15/2010
+
+#Purpose: Process AIS Zip4 data monthly DVD
+#Input: raw data from USPS AIS DVD
+#Output: Zip4 data loaded into database table
+
+#Process:
+#	Upload raw data to server AIS dir
+#		Create current month database tables, process tables
+#		Rename the Upload folder using naming convention
+#	unzip nnn.zip to the /zip4/uzipped dir as nnn.txt
+#		make txt files
+#			process result
+#				log
+#	process nnn.txt files to create | delimited data records rec_nnn.txt
+#		make rec files
+#			count records
+#				log	
+#	copy records to new database ais_zip4_MM_YYYY table
+#		copy each table
+#			process result
+#				log
+#	QA using log table
+#		track each file through the process steps for QA
+#		score the file process\
+#Revisions:
+#1/20/2010
+#disable long  print statements
+#	winscp, session closes if a message is too long to print
+#	Message too long (10251 bytes) to send to external console.
+#	Session 'OL_ec2B' closed.
+#	No session.
+#---------------------------------------------------------
+#1/30/2010
+#Rename the upload directory AIS  to AIS.YYYY.MM
+#database data table 
+#database log table
+#----------------------------------------------------------
+#functions
+def GetProcessResult(cmd):
+ #Run a process and record the result
+ #Input:cmd=system command
+	import os
+	import sys
+	import subprocess
+	print cmd
+	process = subprocess.Popen(cmd,shell=True)
+	process.wait()
+	if process.returncode == 0:
+		out="0"
+	else:
+		r =str(process.returncode)
+		c=str(process.communicate ())
+		out=str(r) + c
+        
+    	return out
+#-------------------------------------------------------------------
+def MakeNewDir(path,dirname,permission):
+	import os
+	os.chdir(pathFromDir)
+	pathToDir=os.path.join(path,dirname)
+	DirThere=os.path.isdir(pathToDir)
+	if DirThere==False:
+		os.mkdir(pathToDir, permission)
+		os.chmod(pathToDir, permission)
+		NewDirPath=str(pathToDir)
+	else:
+		NewDirPath= pathToDir+ "found"
+	
+	return NewDirPath
+#------------------------------------------------------------------------
+def MakeInsertAISLogQry(table,attribute, value, whereclause):
+	# insert into  ais_log_tbl_str  ("zipped") values (path2zippedfile)
+	db_prefix="psql -c "
+	db_suffix="-U postgres -d test"
+	ins_qry="insert into " + table +  "("+'"'+ attribute +'"'+") values ('" + str(value)+ "');"
+	if whereclause !="":
+		ins_qry=ins_qry +"where " + whereclause
+	else:
+		pass
+
+	print ins_qry
+	sql_qry=qry_prefix +'"'+ ins_qry+'"' +qry_suffix 
+	print " created insert query :..."+sql_qry
+	return sql_qry
+#______________________________
+
+def MakeDBTable(name,template):
+	#create a table in the database  from a template
+	name= ais_data_tbl_str
+	createTbl="psql -c"+  "'create table "+ name + " as select * from "+ template;'" + "  -U postgres -d test 1>>lf  2>>ef"
+	
+	Return createTbl
+#------------------------------------------------------------------------
+def MakeUpdateAISLogQry(table,attribute, value, whereclause):
+	#create a  psql insert query which is run by command line
+	# insert into  ais_log_tbl_str  ("zipped") values (path2zippedfile)
+	db_prefix="psql -c "
+	db_suffix="-U postgres -d test"
+
+	up_qry="update " + table +  " set " + attribute + " = '" + value 
+	if whereclause !="":
+		ins_qry=ins_qry + whereclause + ";"
+	else:
+		ins_qry=ins_qry + ";"
+			
+	sql_ins=db_prefix+'"'+ ins_qry+'"' + db_suffix 
+	print sql_ins	
+	return sql_ins
+#----------------------------------------------------------------------------------------
+#Start
+
+#root directory for upload and processing AIS data
+relpath="/ebs3"
+dirUpload="/AIS"
+
+#AIS Zip4 Data is loaded by winscp script to AIS
+dir_AIS_Upload=os.path.join(relpath,dirUpload)"
+
+# Get Current Date 
+#get the date
+s_out=""
+newline="\n"
+x=""
+d=date.today()
+dy=d.year
+#print dy
+dm=d.month
+sdm=str(dm)
+z_sdm=sdm.rjust(2,"0")
+#print z_sdm
+#New name for  Current AIS directory ---------------------
+ais_dir_str="AIS."+str(dy)+"."+z_sdm
+print "this month dir ", ais_dir_str
+
+#Rename Upload dir to Current
+#print "rename top dir to ", ais_dir_str
+ cmd="mv " + dir_AIS_Upload +  " " + relpath+"/"+ais_dir_str
+x=GetProcessResult(cmd)
+if x =="0":
+	s_out=dir_AIS_Upload +"  renamed to : "+ ais_dir_str
+else:
+	s_out=dir_AIS_Upload +"  NOT renamed to : "+ ais_dir_str
+
+#open Current  error logfile 
+ername= "/ebs3/”+ ais_dir_str+ “/process_err.txt"
+ef=open(ername,'w');
+
+#open process logfile
+procname="/ebs3/” + ais_dir_str  + “/process.txt"
+lf=open(procf,'w');
+
+#Make Subdirectories
+Curr_AIS_DirPath =os.join.path(relpath,ais_dir_str)
+#---create SubDir /zip4/unzipped
+
+spath=str(os.path.join(Curr_AIS_DirPath,”zip4”)
+dirname="unzipped"
+permission=777
+ret=""
+x= MakeNewDir(spath,dirname,permission)
+if x =="0":
+	s_out= dirname + "created" 
+	lf.write(s_out)
+	lf.write(newline)
+	print s_out
+else:
+	s_out= dirname + " found" 
+	lf.write(s_out)
+	lf.write(newline)
+	print s_out
+
+#---create /zip4/rec to store processed records files
+spath=str(os.path.join(Curr_AIS_DirPath,”zip4”)
+dirname="rec"
+permission=777
+ret=""
+x= MakeNewDir(spath,dirname,permission)
+if x =="0":
+	s_out= dirname + "created" 
+	lf.write(s_out)
+	lf.write(newline)
+	RecDir=x
+else:
+	ef.write(x)
+	ef.write(newline)
+#_____________________________________________________
+
+#AIS database  connection
+db_prefix="psql -c "
+db_suffix="-U postgres -d test"
+
+#- Current db AIS table name
+ais_data_tbl_str="ais_zip4_"+z_sdm+"_"+str(dy)
+print "db table ",ais_data_tbl_str
+
+#---Create new database ais data table from template
+name= ais_data_tbl_str
+cmd3="psql -c"+  "'create table "+ name + " as select * from  ais_data;'" + "  -U postgres -d test 1>>lf  2>>ef"
+#print cmd3
+#os.system(cmd3)
+x=GetProcessResult(cmd3)
+if x =="0":
+	s_out="database table " + name + "created" 
+	lf.write(s_out)
+	lf.write(newline)
+else:
+	ef.write(x)
+	ef.write(newline)
+
+# Current AIS Log table name
+ais_log_tbl_str="ais_zip4_"+z_sdm+"_"+str(dy)+"_log"
+print "db log table ",ais_log_tbl_str
+
+#--Create new database ais log table from template
+name= ais_log_tbl_str
+cmd2="psql -c"+  "'create table "+ name + " as select * from  ais_data_log;'" + "  -U postgres -d test 1>>lf  2>>ef"
+x=GetProcessResult(cmd2)
+if x =="0":
+	s_out="database log table " + name + "created" 
+	lf.write(s_out)
+	lf.write(newline)
+else:
+	ef.write(x)
+	ef.write(newline)
+
+#-------------------------------------------------------------------
+s_out=str(Curr_AIS_DirPath) + "/zip4 “
+
+#- write nnn.zip files into log file"
+print s_out
+lf.write(s_out)
+lf.write(newline)
+
+#make insert query
+qry_prefix="psql -c "
+qry_suffix= "  -U postgres -d test "
+
+zip4path=os.path.join(AISDataDirPath,"zip4")
+Files = os.listdir(zip4path)
+Files.sort()
+pathFromDir=zip4path	
+pathToDir=os.path.join(zip4path,"unzipped")
+
+db_prefix="psql -c "
+db_suffix="-U postgres -d test"
+
+
+dirZip= zip4path
+dirUnZip=dirZip+"unzipped"
+print "from "+ dirZip+ "  to  "+ dirUnZip
+cmd=""
+zfiles=os.listdir(dirZip)
+zfiles.sort()
+OK=0
+Not=0
+For zfile in zfiles:
+	#------- insert zip file in log table
+	zFilePath=os.path.join(zip4path,zfile)
+	if os.path.isfile(zFilePath):
+		attribute="zipped"
+		whereclause=""
+		value=str(zFilePath)
+		table=ais_log_tbl_str
+		head,tail=os.path.splitext(zfile)
+		#------build insert query--------------------------
+		ins_cmd=MakeInsertAISLogQry(table,attribute, value, whereclause)
+		#---execute insert query-------------------------------
+
+		x=GetProcessResult(ins_cmd)
+		if x =="0":
+			s_out=str(zFilePath) + " logged**********************8 " 
+			lf.write(s_out)
+			lf.write(newline)
+		else:
+			ef.write(x)
+			ef.write(newline)
+#done zipfile log
+For zfile in zfiles:
+
+	print zfile
+cmd="unzip '"+ dirZip + zfile +"' -d " + dirUnZip
+print cmd;
+#os.system(cmd);
+x=GetProcessResult(cmd)
+if x =="0":
+	#----------file unzipped
+OK+=1
+s_out="unzipped " + file + "next update log file"
+lf.write(s_out)
+lf.write(newline)
+else:
+s_out="NOT UNZIPPED " + file + x
+ef.write(s_out)
+ef.write(newline)
+			
+#Update log table with text file 
+txtFilePath=os.path.join(dirUnZip,file)
+if os.path.isfile(txtFilePath):
+attribute="text"
+whereclause=" where zipped = '"+str(zFilePath)+"';"
+table=ais_log_tbl_str
+		#------build update query--------------------------
+			Up_cmd="Update " + table + " set attribute = " + "'" + str(txtFilePath) + "'"+ whereclause	
+			Up_sql=db_prefix + Up_cmd + db_suffix
+			print "update **************** ",Up_sql
+							
+		#---execute update query-------------------------------
+			x=GetProcessResult(Up_sql)
+			if x =="0":
+				s_out=Up_sql + "unzip logged " 
+				lf.write(s_out)
+				lf.write(newline)
+			else:
+				ef.write(x)
+				ef.write(newline)
+		#-----file not unzipped successfully---------------------------------------
+		else:
+			Not +=1
+			ef.write(x)
+			ef.write(newline)
+
+	#---next file to unzip
+#file unzip completed
+Zips=OK + Not
+print str(OK) +"  files unzipped,  " +str(Not) + " files could not be unzipped, of  " + str(Zips) + "  .zip files "
+#-----------------------------------------------------------------------------------------------------------------------------
+#AIS.zip# --------------->AIS.txt--------------------->--Process to records
+
+
+#--------Process Text to Records
+
+#for each file, process lines and write to record file.
+#save record file to the /zip4/rec directory
+#script: /ebs3/loadzip/test/2_AIS_TXT_2_Records.py
+#inputs:  directory containing input text files, directory where output files will be stored
+
+#proc_cmd=python /ebs3/loadzip/test/2_AIS_TXT_2_Records.py  TxtDir  RecDir logtbl
+
+
+recpath=os.path.join(zip4path,dirname)
+
+cmd_proc="python /ebs3/loadzip/AISauto/2_AIS_TXT_2_Records.py " + dirUnZip +" " + recpath + " " + ais_log_tbl_str
+
+#x= GetProcessResult(cmd_proc)
+
+if x =="0":
+	s_out= "Done processing AIS zip4 data to AIS zip4 records " 
+	lf.write(s_out)
+	lf.write(newline)
+	
+else:
+	ef.write(x)
+	ef.write(newline)
+
+
+#______________________________
+#QA for AIS data to Records before loading data to database table
+#
+#Did all files uploaded go through records processing as expected?
+#Perfection= all files were unzipped, processed and stored as records ready for loading table
+#	Number of unzipped files = Number of files loaded to server [ acceptance percentage > x%]
+#	Number of text files processed = Number of records files created
+#	Number of text records read = Number of output records created
+#Create Report 
+#process good-- go ahead and load
+#process very bad_ no load
+#process so so, notify, wait until user OK
+

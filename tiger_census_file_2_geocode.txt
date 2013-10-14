@@ -1,0 +1,140 @@
+# TIGER2009 Files
+# 	* list TIGER2009/state directories
+#
+import os
+import zipfile
+import sys
+import stat
+
+# path to the TIGER2009 data
+relpath="/ebs2/TIGER2009/" 
+subpath=str(relpath);
+
+#Write TIGER2009 state level directories to tgr2009_states.txt
+#open lf for output
+lf= open('/ebs3/loadzip/dev/tgr2009_states.txt','w');# in current dir
+newline="\n";
+
+dirList=os.listdir(relpath);
+dirList.sort()
+dircount=0
+for subd in dirList:
+	str_subdir=str(subd);  	     	    	
+	sub= subpath + str_subdir;
+	#print full path to subdiredctory
+	subdpath=(os.path.join(relpath,subd));
+	if os.path.isdir(subdpath):
+		dircount+=1;
+		#write to output file;
+		#print subdpath
+		s_out=str(subdpath) + newline;
+		lf.write(s_out);
+		
+	#print " found ",dircount, "directories to check for zip shapefiles"
+lf.close();
+#ok from /ebs2/TIGER2009/01_ALABAMA to /ebs2/TIGER2009/AITS_BY_AIA
+#--------------------------------------
+
+
+#Write unzip process steps for QA
+logzip=open('/ebs3/loadzip/dev/tgr_unzip.txt','w');
+s_dircount=str(dircount);
+logzip.write(s_dircount+ " directories found");
+
+#vars
+cd_cmd="";
+cmd_p="pwd";
+txt_dir="";
+i=0;
+
+
+
+#Read TIGER2009 state level directories from tgr2009_states.txt
+lf=open('/ebs3/loadzip/dev/tgr2009_states.txt','r');
+
+#create list from directory count
+Statelist=(0,dircount);
+
+for i in Statelist:
+#------------------------------------begin state 
+	i=0;# start line in file
+	
+	#read, remove newline, space
+	DirIn=lf.readline().rstrip('\n');
+	print DirIn, "-newline";
+	txt_dir=str(DirIn).rstrip();
+	#New state to process
+	print txt_dir, "  -newline";
+	s_out="data directory input:  " +txt_dir;
+	logzip.write(s_out);
+	logzip.write(newline);
+	
+	#print current dir
+	print "current dir is--";
+	os.system(cmd_p);
+	
+	#change the working directory to dir read from file
+	os.chdir(txt_dir);
+	
+	#verify change in current dir
+	cmd2="pwd";
+	print "current dir is--";
+	os.system(cmd2);
+	#
+	#OK, current dir changed to state	
+lf.close(); close state dir list
+
+#---------------------------------------------------------
+#In state directory, find matching files in txt_dir
+#write filepath of matching shp to ‘tgr2009_unzip_shp.txt’
+
+#Identify shapefiles to unzip
+	shps=["tl_2009_*addr.zip","tl_2009_*featnames.zip","tl_2009_*edges.zip"];
+	for shp in shps:    
+		cmd_find="find "+ txt_dir +" -name " + shp + "| tee -a '/ebs3/loadzip/dev/tgr2009_unzip_shp.txt'";
+		print cmd_find;
+		logzip.write(cmd_find);
+		logzip.write(newline);
+		#write full filepath into file
+		os.system(cmd_find);
+		#end find shapefiles
+#-----------------------------------------------------
+#Begin Unzip for state
+# Read filepath of matching files for this state
+# from tgr2009_unzip_shp.txt,and unzip to nearest directory
+#/a/long/way/from/here.zip ------> 	#/a/long/way/from/here.txt	
+	
+	# Open file for input
+	input=open ('/ebs3/loadzip/dev/tgr2009_unzip_shp.txt','r');
+
+	for line in input.readlines():	
+		#read filepath convert to string
+		print line;
+		s_ln=str(line.rstrip('\n'));
+		s_ln=s_ln.rstrip();
+					
+	#get dir for file
+		zd=os.path.dirname(s_ln);
+		print "unzipping to ",zd;
+		
+	#create unzip command
+		cmd_uz="unzip "+"'"+s_ln+"'"+ " -d " + "'"+zd+"'"  ;
+
+	#write unzip command to logfile
+		logzip.write(cmd_uz);
+		logzip.write(newline);
+	
+	#execute unzip command
+		os.system(cmd_uz);
+		# End state files unzip
+
+	#next state
+#done with unzipping state matching shapefiles
+#-------------------------------------------------
+	
+
+
+#---the end -------
+
+12/24/2009 2:00 PM
+
