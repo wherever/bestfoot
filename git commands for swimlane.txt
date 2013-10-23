@@ -1,0 +1,40 @@
+
+HJG@ORCA ~/Documents/GitHub/gitworks (master)
+$ mkdir myproject
+
+HJG@ORCA ~/Documents/GitHub/gitworks (master)
+$ rem myproject
+bash.exe": rem: command not found
+
+HJG@ORCA ~/Documents/GitHub/gitworks (master)
+$ cd\
+> die
+bash.exe": cddie: command not found
+
+HJG@ORCA ~/Documents/GitHub/gitworks (master)
+$ cd \
+> ls
+bash.exe": cd: ls: No such file or directory
+
+HJG@ORCA ~/Documents/GitHub/gitworks (master)
+$ cd "C:/documents/github/
+> mkdir swimlane
+> cd swimlane
+> git status
+> git init
+> git status
+>
+
+HJG@ORCA ~/Documents/GitHub/gitworks (master)
+$ mkdir swimlane
+
+HJG@ORCA ~/Documents/GitHub/gitworks (master)
+$ cd swimlane
+
+HJG@ORCA ~/Documents/GitHub/gitworks/swimlane (master)
+$ git init
+Initialized empty Git repository in c:/Users/HJG/Documents/GitHub/gitworks/swiml
+ane/.git/
+
+HJG@ORCA ~/Documents/GitHub/gitworks/swimlane (master)
+$
